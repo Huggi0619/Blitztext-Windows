@@ -293,8 +293,9 @@ async function pasteText(text) {
   await delay(150); // Fokuswechsel abwarten (wie die 150ms im Original)
 
   let ok = false;
-  if (inputHelper && pasteTargetHwnd) {
-    const res = await helperCommand('paste ' + pasteTargetHwnd, 2500);
+  if (inputHelper) {
+    // Helfer sendet Strg+V per keybd_event und bewahrt NumLock (hwnd 0 = aktuelles Vordergrundfenster).
+    const res = await helperCommand('paste ' + (pasteTargetHwnd || '0'), 2500);
     ok = res === 'ok';
   } else {
     ok = await simulatePasteFallback();
