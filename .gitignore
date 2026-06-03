@@ -1,0 +1,24 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgaben
+dist/
+build-staging/
+out/
+
+# Referenz: geklontes macOS-Original (nicht Teil dieses Repos)
+original-mac-app/
+
+# Logs / Temp
+*.log
+npm-debug.log*
+
+# Lokale Einstellungen / Secrets (liegen ohnehin in %APPDATA%, hier nur zur Sicherheit)
+.env
+*.local
+
+# OS-Müll
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

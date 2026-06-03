@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <title>Blitztext</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container" id="app">
+
+    <!-- ===================== MAIN PAGE ===================== -->
+    <section class="page page-main active" id="page-main">
+      <div class="header">
+        <div class="header-bar">
+          <div class="brand">
+            <span class="brand-title">Blitztext</span>
+            <span class="brand-badge">Windows Preview</span>
+          </div>
+          <button class="gear-btn subtle" id="open-settings" title="Einstellungen" aria-label="Einstellungen"></button>
+        </div>
+
+        <!-- Status: konfiguriert -->
+        <div class="status-configured" id="status-configured">
+          <span class="status-dot green"></span>
+          <span class="status-label">Bereit</span>
+        </div>
+
+        <!-- Status: nicht konfiguriert (versteckt bis Schritt 8 die echte Logik bringt) -->
+        <div class="status-unconfigured" id="status-unconfigured" hidden>
+          <div class="setup-icon" id="setup-icon"></div>
+          <div class="setup-texts">
+            <div class="setup-title">Einrichtung nötig</div>
+            <div class="setup-detail">Öffne die Einstellungen und hinterlege deine Zugangsdaten, um loszulegen.</div>
+          </div>
+          <button class="pill-btn subtle" id="open-settings-2">Einstellungen öffnen</button>
+        </div>
+      </div>
+
+      <!-- Transcription-Mode-Panel -->
+      <div class="mode-panel">
+        <div class="mode-row">
+          <div class="mode-icon online" id="mode-icon"></div>
+          <div class="mode-text">
+            <div class="mode-title" id="mode-title">Online Whisper</div>
+            <div class="mode-subtitle" id="mode-subtitle">Blitztext nutzt gerade die OpenAI-Transkription.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="secure-toggle" />
+            <span class="track"></span>
+            <span class="knob"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Workflow-Liste (wird von renderer.js befüllt) -->
+      <div class="workflow-list" id="workflow-list"></div>
+
+      <div class="footer">
+        <button class="quit-btn subtle" id="quit-btn">Beenden</button>
+      </div>
+    </section>
+
+    <!-- ===================== SETTINGS PAGE ===================== -->
+    <section class="page page-settings" id="page-settings">
+      <div class="sub-header">
+        <button class="back-btn subtle" data-back>
+          <span class="chevron-left"></span>
+          <span>Zurück</span>
+        </button>
+        <span class="sub-title">Einstellungen</span>
+      </div>
+      <div class="divider"></div>
+
+      <div class="settings-tabs">
+        <button class="seg-btn active" data-tab="customize">Anpassen</button>
+        <button class="seg-btn" data-tab="access">Zugang</button>
+      </div>
+
+      <div class="settings-scroll">
+        <!-- ANPASSEN -->
+        <div class="settings-panel" id="settings-customize">
+          <div class="settings-section">
+            <div class="section-label">Tastenkürzel</div>
+            <div class="hotkey-list" id="hotkey-list"></div>
+            <div class="field-label">Modus</div>
+            <div class="segmented" id="hotkey-mode">
+              <button class="seg" data-val="hold">Halten</button>
+              <button class="seg" data-val="toggle">Umschalten</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Blitztext+</div>
+            <div class="field-label">Schreibstil</div>
+            <div class="segmented" id="ti-tone">
+              <button class="seg" data-val="formal">Formell</button>
+              <button class="seg" data-val="neutral">Neutral</button>
+              <button class="seg" data-val="casual">Locker</button>
+            </div>
+            <div class="field-label">Eigene Anweisung</div>
+            <textarea class="field-textarea" id="ti-prompt" rows="3"
+                      placeholder='z.B. "Schreibe prägnant und ohne Füllwörter."'></textarea>
+            <div class="field-label">Kontext</div>
+            <input class="field-input" id="ti-context" type="text"
+                   placeholder='z.B. "E-Mails im Bereich Unternehmensberatung"' />
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Blitztext $%&!</div>
+            <div class="field-label">Eigene Anweisung</div>
+            <textarea class="field-textarea" id="da-prompt" rows="4"
+                      placeholder='z.B. "Formuliere den Text sachlich und freundlich um."'></textarea>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Blitztext :)</div>
+            <div class="field-label">Emoji-Dichte</div>
+            <div class="segmented" id="et-density">
+              <button class="seg" data-val="wenig">Wenig</button>
+              <button class="seg" data-val="mittel">Mittel</button>
+              <button class="seg" data-val="viel">Viel</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Eigennamen</div>
+            <div class="chips" id="term-chips"></div>
+            <div class="term-add">
+              <input class="field-input" id="term-input" type="text" placeholder="Neuer Begriff" />
+              <button class="term-add-btn subtle" id="term-add-btn" title="Hinzufügen">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZUGANG -->
+        <div class="settings-panel" id="settings-access" hidden>
+          <div class="settings-section">
+            <div class="section-head">
+              <span class="section-label">OpenAI API Key</span>
+              <button class="link-btn" id="key-change" hidden>Ändern</button>
+            </div>
+            <div class="key-display" id="key-display" hidden>
+              <span class="key-lock">🔒</span>
+              <span class="key-masked" id="key-masked"></span>
+            </div>
+            <div class="key-edit" id="key-edit">
+              <input class="field-input mono" id="key-input" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+              <button class="pill-btn subtle" id="key-paste">Einfügen</button>
+            </div>
+            <div class="field-hint">Dein Key bleibt lokal in dieser App. Audio und Text werden direkt an die OpenAI API gesendet.</div>
+            <div class="field-error" id="key-error" hidden></div>
+            <div class="save-row">
+              <button class="link-btn save" id="key-save">Speichern</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Beim Anmelden</div>
+            <label class="toggle-row">
+              <span class="toggle-row-label">Blitztext automatisch starten</span>
+              <span class="switch">
+                <input type="checkbox" id="login-toggle" />
+                <span class="track"></span>
+                <span class="knob"></span>
+              </span>
+            </label>
+            <div class="field-hint">Startet Blitztext automatisch nach der Windows-Anmeldung.</div>
+          </div>
+
+          <div class="settings-section">
+            <div class="section-label">Hinweis</div>
+            <div class="note-box">Starte einen Workflow, sprich, und der Text wird automatisch an der Cursorposition deiner zuletzt aktiven App eingefügt.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="quit-btn subtle" data-quit>Beenden</button>
+      </div>
+    </section>
+
+    <!-- ===================== WORKFLOW PAGE ===================== -->
+    <section class="page page-workflow" id="page-workflow">
+      <div class="workflow-header">
+        <button class="back-btn subtle" data-back-workflow>
+          <span class="chevron-left"></span>
+          <span>Zurück</span>
+        </button>
+        <div class="workflow-head-right">
+          <span class="workflow-head-icon" id="workflow-head-icon"></span>
+          <span class="workflow-head-name" id="workflow-head-name">Workflow</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="workflow-content" id="workflow-content"></div>
+      <div class="footer">
+        <button class="quit-btn subtle" data-quit>Beenden</button>
+      </div>
+    </section>
+
+    <!-- ===================== ONBOARDING PAGE (Stub) ===================== -->
+    <section class="page page-onboarding" id="page-onboarding">
+      <div class="sub-header">
+        <span class="sub-title">Willkommen bei Blitztext</span>
+        <button class="back-btn subtle" data-back style="margin-left:auto;">
+          <span>Später</span>
+        </button>
+      </div>
+      <div class="divider"></div>
+      <div class="page-placeholder">Onboarding folgt in einem späteren Schritt.</div>
+      <div class="footer">
+        <button class="quit-btn subtle" data-quit>Beenden</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="icons.js"></script>
+  <script src="waveform.js"></script>
+  <script src="recorder.js"></script>
+  <script src="settings.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

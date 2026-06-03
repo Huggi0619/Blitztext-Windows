@@ -1,0 +1,46 @@
+{
+  "name": "blitztext-windows",
+  "version": "0.1.0",
+  "description": "Blitztext für Windows — Speech-to-Text Tray App (1:1 Port der macOS Menubar App)",
+  "main": "main.js",
+  "author": "Blitztext",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.0.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "build": {
+    "appId": "com.blitztext.windows",
+    "productName": "Blitztext",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "services/**/*",
+      "scripts/win-input.ps1",
+      "assets/tray-icon.png",
+      "assets/icon.ico"
+    ],
+    "asarUnpack": [
+      "scripts/win-input.ps1"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}

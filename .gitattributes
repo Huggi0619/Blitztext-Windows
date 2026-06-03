@@ -1,0 +1,9 @@
+# Zeilenenden plattformübergreifend normalisieren (im Repo LF)
+* text=auto eol=lf
+
+# Binärdateien
+*.png binary
+*.ico binary
+
+# PowerShell-Skripte auf Windows mit CRLF auschecken
+*.ps1 text eol=crlf
