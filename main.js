@@ -9,6 +9,7 @@ const { execFile, spawn } = require('child_process');
 const storage = require('./services/storage');
 const openai = require('./services/openai');
 const quality = require('./services/quality');
+const localTranscription = require('./services/local-transcription');
 
 // ---------------------------------------------------------------------------
 // Globale Referenzen (verhindern, dass der GC Fenster/Tray einsammelt)
@@ -87,6 +88,7 @@ function createWindow() {
     if (process.env.BLITZTEXT_DEV_SETPROMPT) loadOptions.query.setprompt = process.env.BLITZTEXT_DEV_SETPROMPT;
     if (process.env.BLITZTEXT_DEV_NOPASTE === '1') loadOptions.query.nopaste = '1';
     if (process.env.BLITZTEXT_DEV_RECMS) loadOptions.query.recms = process.env.BLITZTEXT_DEV_RECMS;
+    if (process.env.BLITZTEXT_FORCE_LOCAL === '1') loadOptions.query.forcelocal = '1';
   }
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'), loadOptions);
 
@@ -415,17 +417,30 @@ function registerIpc() {
         return { ok: false, error: 'Keine Aufnahme erkannt.' };
       }
 
-      const buffer = Buffer.from(payload.buffer);
-      file = path.join(os.tmpdir(), `blitztext-${Date.now()}.webm`);
-      await fs.promises.writeFile(file, buffer);
-
-      const apiKey = storage.getApiKey() || process.env.OPENAI_API_KEY || '';
       const settings = storage.getSettings();
       const language = settings.language || 'de';
-      // Eigennamen nur bei längeren Aufnahmen als Vokabular-Hinweis (wie im Original, >= 0.9s).
-      const customTerms = duration >= 0.9 ? (settings.textImprovement.customTerms || []) : [];
+      // Slice 1: lokalen Modus per Zwang (BLITZTEXT_FORCE_LOCAL). Slice 2 ersetzt
+      // dies durch settings.secureLocalModeEnabled.
+      const useLocal = process.env.BLITZTEXT_FORCE_LOCAL === '1';
 
-      const raw = await openai.transcribe(file, { apiKey, language, customTerms });
+      const buffer = Buffer.from(payload.buffer);
+      // Lokal kommt bereits eine WAV (16 kHz) aus dem Renderer; online bleibt webm.
+      const ext = (useLocal || payload.mimeType === 'audio/wav') ? 'wav' : 'webm';
+      file = path.join(os.tmpdir(), `blitztext-${Date.now()}.${ext}`);
+      await fs.promises.writeFile(file, buffer);
+
+      let raw;
+      if (useLocal) {
+        // Lokaler Pfad: whisper.cpp statt OpenAI — kein Netzwerk-Call. Fester
+        // Modellpfad (Slice 0/1); Slice 2 nimmt das Modell aus userData.
+        raw = await localTranscription.transcribe(file, { language });
+      } else {
+        const apiKey = storage.getApiKey() || process.env.OPENAI_API_KEY || '';
+        // Eigennamen nur bei längeren Aufnahmen als Vokabular-Hinweis (wie im Original, >= 0.9s).
+        const customTerms = duration >= 0.9 ? (settings.textImprovement.customTerms || []) : [];
+        raw = await openai.transcribe(file, { apiKey, language, customTerms });
+      }
+
       const cleaned = quality.cleanedTranscript(raw);
 
       if (quality.isLikelyArtifact(cleaned, duration)) {
@@ -433,7 +448,9 @@ function registerIpc() {
       }
 
       const type = payload.type || 'transcription';
-      if (type === 'transcription') {
+      // Lokaler Modus: nur reine Transkription — GPT-Workflows bleiben pausiert
+      // (wie im Original). Online: Verbesserer-Workflows hängen GPT an.
+      if (useLocal || type === 'transcription') {
         return { ok: true, text: cleaned };
       }
 
@@ -502,6 +519,20 @@ if (!gotLock) {
     session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
       return permission === 'media' || permission === 'audioCapture';
     });
+
+    // Slice 0 (temporär): Spike-Hook für den lokalen Modus. Beweist, dass
+    // whisper.cpp (Binary + Modell + Aufruf + Output-Parsing) auf diesem Rechner
+    // läuft. Transkribiert eine fixe Test-WAV, loggt das Ergebnis und beendet.
+    // Wird in den nächsten Slices durch den echten lokalen Pfad ersetzt.
+    if (process.env.BLITZTEXT_DEV_WHISPER_TEST === '1') {
+      const testWav = path.join(__dirname, 'bin', 'whisper', 'test-de.wav');
+      dlog('[whisper-test] starte lokale Transkription: ' + testWav);
+      localTranscription.transcribe(testWav, { language: 'de' })
+        .then((text) => dlog('[whisper-test] OK Text="' + text + '"'))
+        .catch((err) => dlog('[whisper-test] FEHLER ' + (err && err.message ? err.message : err)))
+        .finally(() => { isQuitting = true; setTimeout(() => app.quit(), 200); });
+      return;
+    }
 
     startInputHelper();
     createWindow();

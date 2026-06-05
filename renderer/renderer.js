@@ -17,6 +17,13 @@ const WORKFLOWS = [
 const QUERY = new URLSearchParams(location.search);
 const DEV = QUERY.get('dev') === '1';
 const NOPASTE = QUERY.get('nopaste') === '1'; // im Test deaktivieren, um Strg+V im Terminal zu vermeiden
+const FORCE_LOCAL = QUERY.get('forcelocal') === '1'; // Slice 1: lokalen Modus erzwingen (temporär, ohne UI)
+
+// Lokaler Modus aktiv? Slice 1: nur per Zwang (BLITZTEXT_FORCE_LOCAL). Slice 2
+// ergänzt hier state.secureLocalModeEnabled aus dem echten Schalter.
+function useLocalMode() {
+  return FORCE_LOCAL || state.secureLocalModeEnabled;
+}
 
 // --- UI-Zustand (wird in späteren Schritten durch echte Settings ersetzt) ---
 const state = {
@@ -370,11 +377,30 @@ const WorkflowUI = (() => {
     }
 
     applyPhase('processing', 'Wird transkribiert …');
+
+    // Lokaler Modus: Aufnahme zu 16-kHz-Mono-WAV umwandeln (whisper.cpp-Format),
+    // statt das webm/opus an OpenAI zu schicken.
+    let buffer = result.buffer;
+    let mimeType = result.mimeType;
+    if (useLocalMode()) {
+      try {
+        const blob = new Blob([result.buffer], { type: result.mimeType || 'audio/webm' });
+        buffer = await window.blobToWav16k(blob);
+        mimeType = 'audio/wav';
+        if (DEV && window.api && window.api.devLog) {
+          window.api.devLog('local: wav16k bytes=' + buffer.length);
+        }
+      } catch (err) {
+        applyPhase('error', 'Audio-Umwandlung fehlgeschlagen: ' + (err && err.message ? err.message : err));
+        return;
+      }
+    }
+
     try {
       const res = await window.api.runWorkflow({
         type: current ? current.type : 'transcription',
-        buffer: result.buffer,
-        mimeType: result.mimeType,
+        buffer,
+        mimeType,
         duration: result.duration,
       });
       if (res && res.ok) {

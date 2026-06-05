@@ -154,4 +154,58 @@
   }
 
   window.AudioRecorder = AudioRecorder;
+
+  // ==========================================================================
+  // blobToWav16k — Aufnahme (webm/opus) → 16-kHz-Mono-16-bit-PCM-WAV.
+  //   whisper.cpp braucht genau dieses Format (kein ffmpeg nötig, alles via
+  //   Web Audio). Liefert ein Uint8Array (RIFF/WAV) — direkt an runWorkflow.
+  //   (Lokaler Modus, Slice 1.)
+  // ==========================================================================
+  async function blobToWav16k(blob) {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    let decoded;
+    try {
+      decoded = await ac.decodeAudioData(await blob.arrayBuffer());
+    } finally {
+      try { await ac.close(); } catch (_) { /* ignore */ }
+    }
+
+    // Auf 16 kHz Mono resamplen.
+    const frames = Math.max(1, Math.ceil(decoded.duration * 16000));
+    const off = new OfflineAudioContext(1, frames, 16000);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    const pcm = rendered.getChannelData(0); // Float32, 16 kHz, Mono
+
+    return encodeWav16(pcm);
+  }
+
+  // Float32-PCM (16 kHz Mono) → RIFF/WAV (16-bit) als Uint8Array.
+  function encodeWav16(pcm) {
+    const n = pcm.length;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const dv = new DataView(buf);
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE');
+    w(12, 'fmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true);           // PCM
+    dv.setUint16(22, 1, true);           // Mono
+    dv.setUint32(24, 16000, true);       // Samplerate
+    dv.setUint32(28, 32000, true);       // Byte-Rate (16000 * 1 * 2)
+    dv.setUint16(32, 2, true);           // Block-Align
+    dv.setUint16(34, 16, true);          // Bits/Sample
+    w(36, 'data'); dv.setUint32(40, n * 2, true);
+    let o = 44;
+    for (let i = 0; i < n; i++) {
+      const v = Math.max(-1, Math.min(1, pcm[i]));
+      dv.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7FFF, true);
+      o += 2;
+    }
+    return new Uint8Array(buf);
+  }
+
+  window.blobToWav16k = blobToWav16k;
 })();

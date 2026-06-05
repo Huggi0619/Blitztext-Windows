@@ -6,6 +6,11 @@ dist/
 build-staging/
 out/
 
+# whisper.cpp Binärdateien/Modelle/Test-Audio (groß; lokal ablegen, siehe bin/whisper/README.md)
+bin/whisper/*
+!bin/whisper/README.md
+bin/_dl/
+
 # Referenz: geklontes macOS-Original (nicht Teil dieses Repos)
 original-mac-app/
 
