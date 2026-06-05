@@ -321,6 +321,14 @@ button {
 }
 .switch input:checked + .track { background: var(--accent-green); }
 .switch input:checked + .track + .knob { transform: translateX(12px); }
+.switch input:disabled + .track { opacity: 0.5; }
+.switch input:disabled ~ .knob { opacity: 0.6; }
+
+.mode-hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
 
 /* --------------------------------------------------------------------------
    Workflow-Liste

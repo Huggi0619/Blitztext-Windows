@@ -543,14 +543,13 @@ function wireEvents() {
     });
   }
 
+  // Lokaler Modus ist auf Windows noch nicht verfügbar -> Schalter deaktiviert,
+  // damit niemand in einen Zustand ohne nutzbare Workflows gerät.
+  // (Implementierung via whisper.cpp folgt — siehe docs/LOCAL-MODE-PLAN.md.)
   const toggle = document.getElementById('secure-toggle');
-  toggle.checked = state.secureLocalModeEnabled;
-  toggle.addEventListener('change', () => {
-    state.secureLocalModeEnabled = toggle.checked;
-    renderModePanel();
-    renderWorkflows();
-    fitWindowToContent();
-  });
+  state.secureLocalModeEnabled = false;
+  toggle.checked = false;
+  toggle.disabled = true;
 }
 
 // --- Init ------------------------------------------------------------------
